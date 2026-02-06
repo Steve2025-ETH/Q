@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Q</title>
+  <style>
+    body { font-family: -apple-system, system-ui, Arial; margin: 20px; }
+    #chat { border: 1px solid #ddd; padding: 12px; border-radius: 10px; min-height: 260px; }
+    .msg { margin: 10px 0; }
+    .user { font-weight: 600; }
+    .q { font-weight: 600; }
+    #row { display: flex; gap: 10px; margin-top: 12px; }
+    input { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #ddd; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #ddd; background: #fff; }
+    pre { margin: 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Q</h1>
+  <p>Interactive urban mobility system (web text mode).</p>
+
+  <div id="chat"></div>
+
+  <div id="row">
+    <input id="inp" placeholder="Ask Q about mobility (e.g., I am in Nanjing and I need to travel 8 km)" />
+    <button id="send">Send</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
