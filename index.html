@@ -14,6 +14,7 @@
     input { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #ddd; }
     button { padding: 10px 14px; border-radius: 10px; border: 1px solid #ddd; background: #fff; }
     pre { margin: 0; white-space: pre-wrap; }
+    .hint { font-size: 12px; opacity: .75; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -26,6 +27,24 @@
     <input id="inp" placeholder="Ask Q about mobility (e.g., I am in Nanjing and I need to travel 8 km)" />
     <button id="send">Send</button>
   </div>
+
+  <div class="hint">
+    If AI replies fail, refresh and re-enter your Hugging Face token.
+  </div>
+
+  <!-- ✅ 关键：在加载 app.js 之前注入 token（不会进 GitHub） -->
+  <script>
+    (function () {
+      const key = prompt("Enter your Hugging Face API Token (starts with hf_):");
+      if (key && key.trim().startsWith("hf_")) {
+        window.HF_API_TOKEN = key.trim();
+      } else {
+        window.HF_API_TOKEN = "";
+        // 可选：不给 key 也能跑规则系统，只是 AI API 会不可用
+        console.log("No valid HF token provided. AI API features may be unavailable.");
+      }
+    })();
+  </script>
 
   <script src="app.js"></script>
 </body>
