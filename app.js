@@ -1,169 +1,355 @@
-// ===============================
-// Q – Urban Mobility AI (Web)
-// Hugging Face API version
-// Easter Egg included
-// Token stored locally (localStorage)
-// ===============================
+/* Q Mobility (offline, rule-based, city knowledge base)
+   - Works on GitHub Pages (no API)
+   - Supports many cities via fallback heuristics
+   - Includes easter egg 🎁
+*/
 
-const chat = document.getElementById("chat");
-const inp = document.getElementById("inp");
-const btn = document.getElementById("send");
+const CITY_DB = {
+  // --- China ---
+  "nanjing": {
+    display: "Nanjing",
+    country: "China",
+    type: "dense_megacity",
+    transit: 0.90,   // metro/bus strength
+    bike: 0.70,      // bike/e-bike friendliness
+    walk: 0.65,      // walkability
+    congestion: 0.70,
+    notes: [
+      "Dense city: metro + buses are usually efficient for mid-range trips.",
+      "E-bikes are common for 1–5 km trips.",
+      "Rush hour can be crowded; allow buffer time."
+    ],
+    hubs: ["Nanjing South Railway Station", "Nanjing Railway Station"]
+  },
 
-function add(role, text) {
-  const div = document.createElement("div");
-  div.className = "msg " + (role === "You" ? "user" : "q");
-  div.innerHTML = `<pre><b>${role}:</b> ${text}</pre>`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  // --- France ---
+  "paris": {
+    display: "Paris",
+    country: "France",
+    type: "dense_megacity",
+    transit: 0.95,
+    bike: 0.75,
+    walk: 0.85,
+    congestion: 0.80,
+    notes: [
+      "Excellent metro/RER coverage for most trips.",
+      "Cycling is good for 1–6 km if you are comfortable in city traffic.",
+      "Short trips are often fastest on foot + metro."
+    ],
+    hubs: ["Gare du Nord", "Gare de Lyon", "Gare Montparnasse"]
+  },
+
+  // --- USA ---
+  "new york": {
+    display: "New York City",
+    country: "USA",
+    type: "dense_megacity",
+    transit: 0.90,
+    bike: 0.75,
+    walk: 0.85,
+    congestion: 0.85,
+    notes: [
+      "Subway + walking is usually best inside Manhattan and many borough routes.",
+      "Traffic is heavy; taxis can be slower at peak times.",
+      "Cycling is viable on protected lanes."
+    ],
+    hubs: ["Grand Central Terminal", "Penn Station"]
+  },
+
+  "columbia": {
+    display: "Columbia, SC",
+    country: "USA",
+    type: "car_city",
+    transit: 0.35,
+    bike: 0.35,
+    walk: 0.30,
+    congestion: 0.55,
+    notes: [
+      "Lower density: driving is common for many trips.",
+      "Buses can work for specific corridors, but frequency may be limited.",
+      "Walking is best for short campus/downtown trips."
+    ],
+    hubs: ["Columbia Amtrak (nearby)", "Downtown Transit Center"]
+  },
+
+  // Add more cities here as you like:
+  // "shanghai": {...}, "london": {...}, "tokyo": {...}
+};
+
+const CITY_ALIASES = {
+  "nj": "nanjing",
+  "nanjing city": "nanjing",
+  "paris city": "paris",
+  "nyc": "new york",
+  "new york city": "new york",
+  "columbia sc": "columbia",
+  "columbia, sc": "columbia",
+};
+
+// ---------- helpers ----------
+function norm(s) {
+  return (s || "").toLowerCase().trim();
 }
 
-// -------- Token handling (robust) --------
-function getToken() {
-  // 1) from localStorage
-  const saved = localStorage.getItem("HF_API_TOKEN");
-  if (saved && saved.startsWith("hf_")) return saved;
+function findCity(text) {
+  const t = norm(text);
 
-  // 2) from window (if you set it elsewhere)
-  if (window.HF_API_TOKEN && String(window.HF_API_TOKEN).startsWith("hf_")) {
-    localStorage.setItem("HF_API_TOKEN", String(window.HF_API_TOKEN));
-    return String(window.HF_API_TOKEN);
+  // alias hit
+  for (const k of Object.keys(CITY_ALIASES)) {
+    if (t.includes(k)) return CITY_ALIASES[k];
   }
 
-  return "";
-}
-
-function ensureToken() {
-  let token = getToken();
-  if (token) return token;
-
-  token = prompt("Enter your Hugging Face API token (starts with hf_):") || "";
-  token = token.trim();
-
-  if (token.startsWith("hf_")) {
-    localStorage.setItem("HF_API_TOKEN", token);
-    window.HF_API_TOKEN = token;
-    return token;
+  // direct DB hit
+  for (const key of Object.keys(CITY_DB)) {
+    if (t.includes(key)) return key;
   }
 
-  return "";
-}
+  // heuristic: patterns like "I am in X" / "in X"
+  // (best-effort, not perfect)
+  const m1 = t.match(/\bi am in\s+([a-z\s\.,-]+)/i);
+  const m2 = t.match(/\bin\s+([a-z\s\.,-]+)\b/i);
+  const raw = (m1 && m1[1]) || (m2 && m2[1]) || "";
+  const candidate = norm(raw).replace(/[^a-z\s]/g, "").trim();
+  if (!candidate) return null;
 
-// Optional: allow user to reset token by typing "/token"
-function maybeHandleTokenCommand(text) {
-  const t = text.trim().toLowerCase();
-  if (t === "/token" || t === "token" || t === "set token") {
-    const token = prompt("Paste your Hugging Face token (hf_...):") || "";
-    const clean = token.trim();
-    if (clean.startsWith("hf_")) {
-      localStorage.setItem("HF_API_TOKEN", clean);
-      window.HF_API_TOKEN = clean;
-      return "✅ Token saved locally in your browser. Try your question again.";
-    }
-    return "❌ Token not saved. It must start with hf_.";
+  // try partial match with DB keys
+  for (const key of Object.keys(CITY_DB)) {
+    if (candidate.includes(key) || key.includes(candidate)) return key;
   }
-  if (t === "/cleartoken") {
-    localStorage.removeItem("HF_API_TOKEN");
-    window.HF_API_TOKEN = "";
-    return "🧹 Token cleared. Next message will ask for token again.";
-  }
+
   return null;
 }
 
-// -------- AI request --------
-async function askAI(userText) {
-  const token = ensureToken();
-  if (!token) {
-    return "⚠️ Hugging Face token missing. Type /token to set it, or refresh and try again.";
-  }
+function parseDistanceKm(text) {
+  const t = norm(text);
+  // supports: 8 km, 8km, 3.5 km, 2公里
+  let m = t.match(/(\d+(\.\d+)?)\s*km\b/);
+  if (m) return parseFloat(m[1]);
 
-  // System-style instruction to make replies natural + mobility oriented
-  const prompt =
-`You are Q, an urban mobility assistant. Reply in natural English, concise, practical.
-If a city is mentioned, tailor advice to that city.
-If distance is mentioned (km), suggest a travel mode and give a brief reason.
+  m = t.match(/(\d+(\.\d+)?)\s*公里/);
+  if (m) return parseFloat(m[1]);
 
-User: ${userText}
-Q:`.trim();
+  // miles
+  m = t.match(/(\d+(\.\d+)?)\s*mi\b/);
+  if (m) return parseFloat(m[1]) * 1.60934;
 
-  try {
-    const res = await fetch(
-      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + token,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: { max_new_tokens: 160, temperature: 0.7 }
-        })
-      }
-    );
-
-    const data = await res.json();
-
-    // common HF: model loading
-    if (data?.error && String(data.error).toLowerCase().includes("loading")) {
-      return "⏳ The model is loading on Hugging Face. Wait ~20 seconds and send again.";
-    }
-
-    // normal text-generation response
-    if (Array.isArray(data) && data[0]?.generated_text) {
-      let out = data[0].generated_text;
-
-      // remove the prompt part if echoed
-      if (out.includes("Q:")) out = out.split("Q:").slice(-1)[0];
-      return out.trim();
-    }
-
-    if (data?.error) return "❌ API error: " + data.error;
-
-    return "⚠️ Unexpected API response.";
-
-  } catch (e) {
-    return "❌ Network error. Check connection or token.";
-  }
+  return null;
 }
 
-// -------- main send --------
-btn.onclick = async () => {
-  const q = inp.value.trim();
-  if (!q) return;
+function hasAny(text, arr) {
+  const t = norm(text);
+  return arr.some(x => t.includes(x));
+}
 
-  add("You", q);
-  inp.value = "";
+function parseConditions(text) {
+  const t = norm(text);
+  return {
+    rain: hasAny(t, ["rain", "raining", "storm", "wet", "shower", "下雨", "雨天"]),
+    hurry: hasAny(t, ["hurry", "urgent", "late", "asap", "rush", "赶时间", "来不及", "迟到"]),
+    night: hasAny(t, ["night", "late night", "midnight", "晚上", "夜里", "深夜"]),
+    luggage: hasAny(t, ["luggage", "suitcase", "bag", "行李", "箱子"]),
+    accessible: hasAny(t, ["wheelchair", "accessible", "disability", "无障碍", "轮椅"]),
+    rushHour: hasAny(t, ["rush hour", "peak", "morning peak", "evening peak", "高峰", "早高峰", "晚高峰"]),
+    budget: hasAny(t, ["cheap", "budget", "save money", "省钱", "便宜"]),
+    safety: hasAny(t, ["safe", "safety", "danger", "危险", "安全"])
+  };
+}
 
-  // Token commands
-  const tokenCmd = maybeHandleTokenCommand(q);
-  if (tokenCmd) {
-    add("Q", tokenCmd);
-    return;
+function cityTypeGuess(cityKey) {
+  // fallback if city not found
+  return {
+    display: cityKey ? cityKey : "your city",
+    country: "Unknown",
+    type: "unknown",
+    transit: 0.55,
+    bike: 0.50,
+    walk: 0.50,
+    congestion: 0.55,
+    notes: [
+      "No city profile found. Using general urban mobility rules."
+    ],
+    hubs: []
+  };
+}
+
+// ---------- core mobility logic ----------
+function recommendMode(cityProfile, km, cond) {
+  // distance missing: give structured questions + generic suggestions
+  if (km == null || isNaN(km)) {
+    return {
+      mode: "Need distance",
+      reason:
+        "Tell me the distance (e.g., 3 km / 8 km) and constraints (rain, hurry, night). Then I can give a sharper recommendation."
+    };
   }
 
-  const t = q.toLowerCase();
+  // base thresholds
+  // Very short
+  if (km <= 1) {
+    if (cond.rain) return { mode: "Metro/Bus + short walk", reason: "In rain, staying dry matters even for short trips." };
+    return { mode: "Walk", reason: "Under 1 km, walking is usually the fastest and simplest." };
+  }
 
-  // 🎁 Easter Egg (LOCAL, NO API)
-  const eggTriggers = [
+  // Short
+  if (km <= 5) {
+    if (cond.luggage || cond.accessible) return { mode: "Metro/Bus or taxi/ride-hailing", reason: "Comfort and access matter with luggage/needs." };
+    if (cond.rain) return { mode: "Metro/Bus", reason: "Rain makes cycling less comfortable and less safe." };
+    // city-specific bias
+    if (cityProfile.bike >= 0.65) return { mode: "Bike / e-bike", reason: "For 1–5 km, bike/e-bike is efficient in many cities." };
+    if (cityProfile.walk >= 0.70) return { mode: "Walk + public transport", reason: "Walkability is decent; mix with transit if needed." };
+    return { mode: "Bus/Metro (if available)", reason: "Public transport is a good default for short trips." };
+  }
+
+  // Medium
+  if (km <= 15) {
+    if (cond.hurry) {
+      if (cityProfile.transit >= 0.75) return { mode: "Metro/Rail", reason: "Transit avoids traffic uncertainty when you’re in a hurry." };
+      return { mode: "Taxi/ride-hailing", reason: "If transit is weak, a direct car route is often faster." };
+    }
+    if (cond.rushHour && cityProfile.transit >= 0.70) {
+      return { mode: "Metro/Rail", reason: "Rush hour traffic makes road options slower; rail is more reliable." };
+    }
+    if (cityProfile.transit >= 0.70) return { mode: "Metro/Bus", reason: "Mid-range trips are where transit shines most." };
+    return { mode: "Car/ride-hailing", reason: "In car-oriented cities, road travel is often the practical choice." };
+  }
+
+  // Long
+  if (km > 15) {
+    if (cityProfile.transit >= 0.75) return { mode: "Rail + last-mile", reason: "Long distance: rail is efficient, then connect by bus/walk." };
+    return { mode: "Car (or intercity bus/train if available)", reason: "Long trips need high-speed corridors; pick the most direct option." };
+  }
+
+  return { mode: "Public transport", reason: "Default recommendation." };
+}
+
+function estimateCO2(mode, km) {
+  // rough grams CO2 per km (illustrative)
+  // Walk/Bike ~ 0, Metro ~ 35, Bus ~ 80, Car ~ 170, Taxi ~ 200
+  if (km == null) return null;
+
+  const m = norm(mode);
+  let gpkm = 100;
+  if (m.includes("walk")) gpkm = 0;
+  else if (m.includes("bike")) gpkm = 0;
+  else if (m.includes("metro") || m.includes("rail")) gpkm = 35;
+  else if (m.includes("bus")) gpkm = 80;
+  else if (m.includes("taxi")) gpkm = 200;
+  else if (m.includes("car")) gpkm = 170;
+
+  return Math.round(gpkm * km);
+}
+
+function formatCityExtras(cityProfile) {
+  const hubs = (cityProfile.hubs || []).slice(0, 2);
+  if (!hubs.length) return "";
+  return `\n\n🚉 Nearby major hubs: ${hubs.join(" / ")}`;
+}
+
+// ---------- easter egg 🎁 ----------
+function easterEgg(text) {
+  const t = norm(text);
+  const triggers = [
     "who is the smartest person",
     "who is the smartest person in the world",
     "who is the most intelligent person",
     "who is the smartest human"
   ];
-  if (eggTriggers.some(s => t.includes(s))) {
-    add("Q", "The smartest person in the world is Qian Zhou.");
-    return;
+  if (triggers.some(x => t.includes(x))) {
+    // 保留你原来的彩蛋风格
+    return "The smartest person in the world is Qian Zhou.";
+  }
+  return null;
+}
+
+// ---------- UI binding ----------
+function addMsg(who, text) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = "msg";
+  const label = who === "user" ? "You" : "Q";
+  div.innerHTML = `<span class="${who}">${label}:</span> <pre>${text}</pre>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function buildAnswer(userText) {
+  // easter egg first
+  const egg = easterEgg(userText);
+  if (egg) return egg;
+
+  const cityKey = findCity(userText);
+  const profile = cityKey ? CITY_DB[cityKey] : cityTypeGuess(null);
+  const km = parseDistanceKm(userText);
+  const cond = parseConditions(userText);
+
+  const rec = recommendMode(profile, km, cond);
+  const co2g = estimateCO2(rec.mode, km);
+
+  const cityLine = cityKey
+    ? `📍 City detected: ${profile.display} (${profile.country})`
+    : `📍 City not recognized. Using general rules. (Tip: say "I am in Paris/Nanjing/New York...")`;
+
+  const condLine = [
+    cond.rain ? "rain" : null,
+    cond.hurry ? "hurry" : null,
+    cond.night ? "night" : null,
+    cond.luggage ? "luggage" : null,
+    cond.accessible ? "accessible" : null,
+    cond.rushHour ? "rush hour" : null,
+    cond.budget ? "budget" : null
+  ].filter(Boolean);
+
+  const conditions = condLine.length ? `🧩 Conditions: ${condLine.join(", ")}` : `🧩 Conditions: none detected`;
+
+  const dataNotes = (profile.notes || []).slice(0, 3).map(x => `- ${x}`).join("\n");
+  const co2Line = (co2g != null)
+    ? `🌿 CO₂ estimate (rough): ~${co2g} g for ${km.toFixed(1)} km`
+    : `🌿 CO₂ estimate: provide distance to estimate`;
+
+  return [
+    cityLine,
+    conditions,
+    "",
+    `✅ Recommendation: ${rec.mode}`,
+    `🧠 Reason: ${rec.reason}`,
+    co2Line,
+    formatCityExtras(profile),
+    "",
+    "📚 City profile notes:",
+    dataNotes,
+    "",
+    "🧪 Example inputs you can try:",
+    '- "I am in Nanjing and need to travel 8 km during rush hour"',
+    '- "In Paris, 3 km, raining, I am in a hurry"',
+    '- "New York City, 18 km, late night, with luggage"'
+  ].join("\n");
+}
+
+function onSend() {
+  const inp = document.getElementById("inp");
+  const text = (inp.value || "").trim();
+  if (!text) return;
+
+  addMsg("user", text);
+  const ans = buildAnswer(text);
+  addMsg("q", ans);
+
+  inp.value = "";
+}
+
+function init() {
+  const btn = document.getElementById("send");
+  const inp = document.getElementById("inp");
+
+  if (btn) btn.addEventListener("click", onSend);
+  if (inp) {
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") onSend();
+    });
   }
 
-  add("Q", "Thinking…");
-  const answer = await askAI(q);
+  // greeting
+  addMsg("q", "Hi! Ask me about mobility in any city. Example: 'I am in Nanjing and need to travel 8 km during rush hour'.");
+}
 
-  // remove "Thinking…"
-  chat.removeChild(chat.lastChild);
-  add("Q", answer);
-};
-
-// Enter key
-inp.addEventListener("keydown", e => {
-  if (e.key === "Enter") btn.onclick();
-});
+document.addEventListener("DOMContentLoaded", init);
