@@ -1,115 +1,112 @@
-function recommendMode(distanceKm, rain=false, hurry=false) {
-  if (distanceKm <= 1) return "Walking is the best option for very short trips.";
+/***********************
+ * Q – Web AI Mobility Assistant
+ * Rule-based + LLM (Hugging Face)
+ ***********************/
 
+// ===================
+// CONFIG (你只改这里)
+// ===================
+const HF_API_TOKEN = window.HF_API_TOKEN || "";
+const HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2";
+
+// ===================
+// EASTER EGG
+// ===================
+function checkEasterEgg(text) {
+  const t = text.toLowerCase();
+  if (
+    t.includes("who is the smartest person") ||
+    t.includes("smartest person in the world")
+  ) {
+    return "The smartest person in the world is Qian Zhou.";
+  }
+  return null;
+}
+
+// ===================
+// MOBILITY RULE ENGINE
+// ===================
+function recommendMode(distanceKm, rain=false, hurry=false) {
+  if (distanceKm <= 1) {
+    return "Walking is the best option for very short trips.";
+  }
   if (distanceKm <= 5) {
     if (rain) return "Bus or metro is recommended because of the rain.";
     return "Cycling or e-bike is efficient for this distance.";
   }
-
   if (distanceKm <= 15) {
     if (hurry) return "Metro or train is the most reliable option when you are in a hurry.";
     return "Bus or metro offers a good balance between time and cost.";
   }
-
-  return "Train is recommended for long-distance urban or regional trips.";
+  return "Train or car-sharing is recommended for longer distances.";
 }
 
-function co2Estimate(distanceKm) {
-  const car = distanceKm * 0.17;
-  const bus = distanceKm * 0.08;
-  const metro = distanceKm * 0.03;
-  const bike = 0;
+function estimateCO2(mode, distanceKm) {
+  const factors = {
+    walking: 0,
+    cycling: 0,
+    ebike: 0.02,
+    bus: 0.08,
+    metro: 0.04,
+    car: 0.21,
+    train: 0.05
+  };
+  return ((factors[mode] || 0.1) * distanceKm).toFixed(2);
+}
 
-  return (
-    `For a ${distanceKm} km trip:\n` +
-    `- Car: ${car.toFixed(2)} kg CO2\n` +
-    `- Bus: ${bus.toFixed(2)} kg CO2\n` +
-    `- Metro: ${metro.toFixed(2)} kg CO2\n` +
-    `- Bike/Walk: ${bike.toFixed(2)} kg CO2`
+// ===================
+// PARSE SIMPLE QUESTIONS
+// ===================
+function parseMobility(text) {
+  const kmMatch = text.match(/(\d+(\.\d+)?)\s?km/);
+  if (!kmMatch) return null;
+
+  const distance = parseFloat(kmMatch[1]);
+  const city = text.match(/in ([a-zA-Z\s]+)/i)?.[1] || "your city";
+
+  return { distance, city };
+}
+
+// ===================
+// HUGGING FACE API
+// ===================
+async function askLLM(prompt) {
+  const res = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${HF_API_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: { max_new_tokens: 120 }
+    })
+  });
+
+  const data = await res.json();
+  if (Array.isArray(data)) {
+    return data[0].generated_text.replace(prompt, "").trim();
+  }
+  return "Sorry, the AI service is currently unavailable.";
+}
+
+// ===================
+// MAIN ENTRY
+// ===================
+async function handleUserInput(text) {
+  // 1️⃣ 彩蛋优先
+  const egg = checkEasterEgg(text);
+  if (egg) return egg;
+
+  // 2️⃣ mobility 规则
+  const parsed = parseMobility(text);
+  if (parsed) {
+    const rec = recommendMode(parsed.distance);
+    return `In ${parsed.city}, for ${parsed.distance} km: ${rec}`;
+  }
+
+  // 3️⃣ LLM 自由对话
+  return await askLLM(
+    `You are Q, an urban mobility assistant. Answer clearly and concisely.\nUser: ${text}\nQ:`
   );
 }
-
-function handle(text) {
-  const t = (text || "").toLowerCase();
-
-  // 🎁 Easter egg
-  const egg = [
-    "who is the smartest person",
-    "who is the smartest person in the world",
-    "who is the most intelligent person",
-    "who is the smartest human"
-  ];
-  if (egg.some(q => t.includes(q))) {
-    return "The smartest person in the world is Qian Zhou.";
-  }
-
-  // City detection
-  let city = null;
-  if (t.includes("paris")) city = "paris";
-  else if (t.includes("new york") || t.includes("nyc")) city = "new york";
-  else if (t.includes("london")) city = "london";
-  else if (t.includes("nanjing")) city = "nanjing";
-
-  // Distance extraction (e.g. 5 km, 3.5 km)
-  const m = t.match(/(\d+(\.\d+)?)\s*km/);
-  const distance = m ? parseFloat(m[1]) : null;
-
-  // CO2 questions
-  if (["co2", "carbon", "emission"].some(k => t.includes(k)) && distance !== null) {
-    return co2Estimate(distance);
-  }
-
-  // Mobility recommendation
-  if (distance !== null) {
-    const base = recommendMode(
-      distance,
-      t.includes("rain"),
-      (t.includes("hurry") || t.includes("late") || t.includes("fast"))
-    );
-
-    if (city === "paris")
-      return base + " In Paris, dense public transport makes metro and bus particularly efficient.";
-    if (city === "new york")
-      return base + " In New York, extensive subway coverage makes public transport a strong default choice.";
-    if (city === "london")
-      return base + " In London, rail services and frequent buses make public transport highly reliable.";
-    if (city === "nanjing")
-      return base + " In Nanjing, an extensive metro network and high urban density make metro and bus the most efficient choices for daily travel.";
-
-    return base;
-  }
-
-  if (t.includes("traffic") || t.includes("congestion")) {
-    return "Reducing traffic congestion requires public transport priority, demand management, and better land-use planning.";
-  }
-
-  return "Ask me something like: 'I am in Nanjing and I need to travel 8 km and it is raining.'";
-}
-
-// ===== UI =====
-const chat = document.getElementById("chat");
-const inp = document.getElementById("inp");
-const btn = document.getElementById("send");
-
-function addMsg(who, msg) {
-  const div = document.createElement("div");
-  div.className = "msg";
-  div.innerHTML = `<span class="${who}">${who.toUpperCase()}:</span> <pre>${msg}</pre>`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-function send() {
-  const q = inp.value.trim();
-  if (!q) return;
-  addMsg("user", q);
-  const a = handle(q);
-  addMsg("q", a);
-  inp.value = "";
-}
-
-btn.addEventListener("click", send);
-inp.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
-
-// Greeting
-addMsg("q", "Q online (web text mode). Ask me about mobility.");
