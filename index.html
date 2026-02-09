@@ -2,42 +2,103 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Q</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Q Mobility</title>
   <style>
-    body { font-family: -apple-system, system-ui, Arial; margin: 20px; }
-    #chat { border: 1px solid #ddd; padding: 12px; border-radius: 10px; min-height: 260px; }
+    :root { --border:#ddd; --muted:#666; }
+    body { font-family: -apple-system, system-ui, Arial, sans-serif; margin: 20px; }
+    h1 { margin: 0 0 6px 0; font-size: 28px; }
+    .sub { color: var(--muted); margin: 0 0 16px 0; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; max-width: 920px; }
+    .row { display: flex; gap: 10px; margin-top: 12px; }
+    input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 16px;
+    }
+    button {
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 16px;
+    }
+    button:active { transform: scale(0.99); }
+    #chat {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 260px;
+      max-height: 420px;
+      overflow: auto;
+      background: #fff;
+    }
     .msg { margin: 10px 0; }
-    .user { font-weight: 600; }
-    .q { font-weight: 600; }
-    #row { display: flex; gap: 10px; margin-top: 12px; }
-    input { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #ddd; }
-    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #ddd; background: #fff; }
-    .hint { font-size: 12px; opacity: .75; margin-top: 8px; }
+    .user { font-weight: 700; }
+    .q { font-weight: 700; }
+    pre { margin: 6px 0 0 0; white-space: pre-wrap; word-break: break-word; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+    .examples { margin-top: 10px; font-size: 13px; color: var(--muted); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      margin: 6px 6px 0 0;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+    }
   </style>
 </head>
 
 <body>
   <h1>Q</h1>
-  <p>Interactive urban mobility system (web text mode).</p>
+  <p class="sub">Interactive urban mobility assistant (offline rule engine).</p>
 
-  <div id="chat"></div>
+  <div class="card">
+    <div id="chat"></div>
 
-  <!-- Hugging Face token input -->
-  <div id="row">
-    <input id="token" placeholder="Enter Hugging Face token (hf_...)" />
-    <button id="saveToken">Save token</button>
+    <div class="row">
+      <input
+        id="inp"
+        placeholder='Ask Q (e.g., "I am in Nanjing and need to travel 8 km during rush hour")'
+        autocomplete="off"
+      />
+      <button id="send">Send</button>
+    </div>
+
+    <div class="examples">
+      Tap an example:
+      <span class="pill" data-q='I am in Nanjing and need to travel 8 km during rush hour'>Nanjing 8 km rush hour</span>
+      <span class="pill" data-q='In Paris, 3 km, raining, I am in a hurry'>Paris 3 km raining hurry</span>
+      <span class="pill" data-q='New York City, 18 km, late night, with luggage'>NYC 18 km late night luggage</span>
+      <span class="pill" data-q='Who is the smartest person in the world?'>Easter egg 🎁</span>
+    </div>
+
+    <div class="hint">
+      ✅ Works on GitHub Pages with no API.<br/>
+      Tip: include a city name + distance (km) + conditions (rain / hurry / night / luggage / rush hour) for best results.
+    </div>
   </div>
 
-  <div id="row">
-    <input id="inp" placeholder="Ask Q (e.g. I am in Nanjing and I need to travel 8 km)" />
-    <button id="send">Send</button>
-  </div>
+  <!-- Offline logic lives in app.js -->
+  <script src="app.js"></script>
 
-  <div class="hint">
-    Token is stored locally in your browser only. It is NOT uploaded to GitHub.
-  </div>
-
-  <script src="app.js?v=9999"></script>
+  <script>
+    // Small UX helper: click pills to autofill + send
+    document.addEventListener("click", (e) => {
+      const pill = e.target.closest(".pill");
+      if (!pill) return;
+      const q = pill.getAttribute("data-q") || "";
+      const inp = document.getElementById("inp");
+      inp.value = q;
+      // trigger send
+      const btn = document.getElementById("send");
+      btn.click();
+    });
+  </script>
 </body>
 </html>
