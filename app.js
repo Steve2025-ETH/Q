@@ -2,8 +2,10 @@
    - Works on GitHub Pages (no API)
    - Supports many cities via fallback heuristics
    - Includes easter egg 🎁
+   - Adds self-intro + mobility jokes
 */
 
+// ================= CITY DATABASE =================
 const CITY_DB = {
   // --- China ---
   "nanjing": {
@@ -22,6 +24,86 @@ const CITY_DB = {
     hubs: ["Nanjing South Railway Station", "Nanjing Railway Station"]
   },
 
+  "shanghai": {
+    display: "Shanghai",
+    country: "China",
+    type: "dense_megacity",
+    transit: 0.95,
+    bike: 0.65,
+    walk: 0.70,
+    congestion: 0.85,
+    notes: [
+      "Huge metro network; metro + walking often wins.",
+      "Peak hours can be intense; add buffer time.",
+      "E-bikes help for 1–5 km trips, but watch traffic."
+    ],
+    hubs: ["Hongqiao Railway Station", "Shanghai Railway Station"]
+  },
+
+  "beijing": {
+    display: "Beijing",
+    country: "China",
+    type: "administrative_megacity",
+    transit: 0.90,
+    bike: 0.60,
+    walk: 0.60,
+    congestion: 0.85,
+    notes: [
+      "Ring-road structure increases car congestion.",
+      "Metro is usually the most reliable option.",
+      "Distances can feel longer; plan transfers."
+    ],
+    hubs: ["Beijing South Railway Station", "Beijing West Railway Station"]
+  },
+
+  "shenzhen": {
+    display: "Shenzhen",
+    country: "China",
+    type: "tech_megacity",
+    transit: 0.90,
+    bike: 0.70,
+    walk: 0.65,
+    congestion: 0.75,
+    notes: [
+      "Modern metro system; usually efficient for mid-range trips.",
+      "E-bikes are practical for short trips.",
+      "New districts mean longer distances; rail helps."
+    ],
+    hubs: ["Shenzhen North Railway Station", "Futian Railway Station"]
+  },
+
+  "chengdu": {
+    display: "Chengdu",
+    country: "China",
+    type: "new_tier1",
+    transit: 0.85,
+    bike: 0.65,
+    walk: 0.60,
+    congestion: 0.70,
+    notes: [
+      "Fast-growing metro; good for 5–15 km trips.",
+      "Cycling can work well for short distances.",
+      "Rush hour exists but is often manageable."
+    ],
+    hubs: ["Chengdu East Railway Station", "Chengdu South Railway Station"]
+  },
+
+  "hong kong": {
+    display: "Hong Kong",
+    country: "China",
+    type: "ultra_dense_city",
+    transit: 0.98,
+    bike: 0.30,
+    walk: 0.80,
+    congestion: 0.65,
+    notes: [
+      "MTR is extremely reliable; rail + walking dominates.",
+      "Short trips: walking + MTR is usually fastest.",
+      "Road travel can be slow during peak periods."
+    ],
+    hubs: ["Hong Kong Station", "Kowloon Station"]
+  },
+
   // --- France ---
   "paris": {
     display: "Paris",
@@ -37,6 +119,87 @@ const CITY_DB = {
       "Short trips are often fastest on foot + metro."
     ],
     hubs: ["Gare du Nord", "Gare de Lyon", "Gare Montparnasse"]
+  },
+
+  "lyon": {
+    display: "Lyon",
+    country: "France",
+    type: "dense_city",
+    transit: 0.85,
+    bike: 0.70,
+    walk: 0.80,
+    congestion: 0.65,
+    notes: [
+      "Metro/tram covers the core well.",
+      "Cycling is practical for many short trips.",
+      "Avoid driving in the center at peak times."
+    ],
+    hubs: ["Lyon Part-Dieu", "Lyon Perrache"]
+  },
+
+  // --- UK / Europe ---
+  "london": {
+    display: "London",
+    country: "UK",
+    type: "dense_megacity",
+    transit: 0.90,
+    bike: 0.65,
+    walk: 0.80,
+    congestion: 0.85,
+    notes: [
+      "Underground + rail covers most areas.",
+      "Congestion can be brutal; rail is more predictable.",
+      "Walking + transit often beats cars in the center."
+    ],
+    hubs: ["King's Cross St Pancras", "Waterloo Station"]
+  },
+
+  "berlin": {
+    display: "Berlin",
+    country: "Germany",
+    type: "bike_friendly_city",
+    transit: 0.85,
+    bike: 0.85,
+    walk: 0.75,
+    congestion: 0.60,
+    notes: [
+      "Cycling is strong and often fastest for short trips.",
+      "S-Bahn and U-Bahn are reliable for mid-range trips.",
+      "Lower congestion compared with many capitals."
+    ],
+    hubs: ["Berlin Hbf"]
+  },
+
+  "amsterdam": {
+    display: "Amsterdam",
+    country: "Netherlands",
+    type: "bike_city",
+    transit: 0.80,
+    bike: 0.95,
+    walk: 0.80,
+    congestion: 0.55,
+    notes: [
+      "Cycling dominates most daily mobility.",
+      "Compact city: short trips are easy on bike or foot.",
+      "Transit supports longer trips and bad weather."
+    ],
+    hubs: ["Amsterdam Centraal"]
+  },
+
+  "barcelona": {
+    display: "Barcelona",
+    country: "Spain",
+    type: "walkable_city",
+    transit: 0.85,
+    bike: 0.70,
+    walk: 0.85,
+    congestion: 0.70,
+    notes: [
+      "Walkable grid + metro makes mobility efficient.",
+      "Cycling works well for medium short distances.",
+      "Driving is less ideal in central areas."
+    ],
+    hubs: ["Barcelona Sants"]
   },
 
   // --- USA ---
@@ -72,18 +235,95 @@ const CITY_DB = {
     hubs: ["Columbia Amtrak (nearby)", "Downtown Transit Center"]
   },
 
-  // Add more cities here as you like:
-  // "shanghai": {...}, "london": {...}, "tokyo": {...}
+  "los angeles": {
+    display: "Los Angeles",
+    country: "USA",
+    type: "car_city",
+    transit: 0.45,
+    bike: 0.40,
+    walk: 0.35,
+    congestion: 0.90,
+    notes: [
+      "Car-oriented layout; traffic can dominate travel time.",
+      "Transit works on some corridors, but coverage varies.",
+      "Plan extra time during peak hours."
+    ],
+    hubs: ["LA Union Station"]
+  },
+
+  "san francisco": {
+    display: "San Francisco",
+    country: "USA",
+    type: "mixed_city",
+    transit: 0.80,
+    bike: 0.70,
+    walk: 0.75,
+    congestion: 0.70,
+    notes: [
+      "Transit + walking works well in the dense core.",
+      "Hills reduce cycling comfort; e-bikes help.",
+      "Cars can be slow due to traffic and parking."
+    ],
+    hubs: ["Salesforce Transit Center"]
+  },
+
+  "chicago": {
+    display: "Chicago",
+    country: "USA",
+    type: "rail_city",
+    transit: 0.80,
+    bike: 0.65,
+    walk: 0.70,
+    congestion: 0.75,
+    notes: [
+      "Strong rail system (L) plus walkable grid areas.",
+      "Weather impacts walking/cycling in winter.",
+      "Downtown is often faster by rail."
+    ],
+    hubs: ["Chicago Union Station"]
+  }
 };
 
 const CITY_ALIASES = {
   "nj": "nanjing",
   "nanjing city": "nanjing",
+
+  "shanghai city": "shanghai",
+  "shanghai, china": "shanghai",
+
+  "beijing city": "beijing",
+  "peking": "beijing",
+
+  "shenzhen city": "shenzhen",
+
+  "chengdu city": "chengdu",
+
+  "hong kong": "hong kong",
+  "hk": "hong kong",
+  "hkg": "hong kong",
+
   "paris city": "paris",
+  "lyon city": "lyon",
+
+  "london city": "london",
+  "berlin city": "berlin",
+  "amsterdam city": "amsterdam",
+  "barcelona city": "barcelona",
+
   "nyc": "new york",
   "new york city": "new york",
+
   "columbia sc": "columbia",
   "columbia, sc": "columbia",
+
+  "la": "los angeles",
+  "los angeles city": "los angeles",
+
+  "sf": "san francisco",
+  "san fran": "san francisco",
+  "san francisco city": "san francisco",
+
+  "chicago city": "chicago"
 };
 
 // ---------- helpers ----------
@@ -183,7 +423,6 @@ function recommendMode(cityProfile, km, cond) {
     };
   }
 
-  // base thresholds
   // Very short
   if (km <= 1) {
     if (cond.rain) return { mode: "Metro/Bus + short walk", reason: "In rain, staying dry matters even for short trips." };
@@ -194,7 +433,6 @@ function recommendMode(cityProfile, km, cond) {
   if (km <= 5) {
     if (cond.luggage || cond.accessible) return { mode: "Metro/Bus or taxi/ride-hailing", reason: "Comfort and access matter with luggage/needs." };
     if (cond.rain) return { mode: "Metro/Bus", reason: "Rain makes cycling less comfortable and less safe." };
-    // city-specific bias
     if (cityProfile.bike >= 0.65) return { mode: "Bike / e-bike", reason: "For 1–5 km, bike/e-bike is efficient in many cities." };
     if (cityProfile.walk >= 0.70) return { mode: "Walk + public transport", reason: "Walkability is decent; mix with transit if needed." };
     return { mode: "Bus/Metro (if available)", reason: "Public transport is a good default for short trips." };
@@ -224,7 +462,6 @@ function recommendMode(cityProfile, km, cond) {
 
 function estimateCO2(mode, km) {
   // rough grams CO2 per km (illustrative)
-  // Walk/Bike ~ 0, Metro ~ 35, Bus ~ 80, Car ~ 170, Taxi ~ 200
   if (km == null) return null;
 
   const m = norm(mode);
@@ -245,6 +482,56 @@ function formatCityExtras(cityProfile) {
   return `\n\n🚉 Nearby major hubs: ${hubs.join(" / ")}`;
 }
 
+// ---------- self intro ----------
+function selfIntro() {
+  return [
+    "👋 Hi, I'm Q (Q Mobility).",
+    "I am an offline, rule-based mobility assistant running on GitHub Pages (no API).",
+    "I help you choose a travel mode using distance + conditions (rain / rush hour / luggage / hurry).",
+    "",
+    "🧑‍💻 Developer:",
+    "Q was developed by Qian Zhou.",
+    "",
+    "🧭 How to use me:",
+    '- "I am in Hong Kong and need to travel 6 km, raining, in a hurry"',
+    '- "Paris, 3 km, rush hour"',
+    '- "New York City, 18 km, late night, with luggage"'
+  ].join("\n");
+}
+
+function isIntroTrigger(text) {
+  const t = norm(text);
+  return [
+    "who are you",
+    "introduce yourself",
+    "what are you",
+    "about you",
+    "你是谁",
+    "自我介绍",
+    "介绍一下你",
+    "你是什么"
+  ].some(x => t.includes(x));
+}
+
+// ---------- mobility jokes ----------
+const MOBILITY_JOKES = [
+  "🚇 Why did the commuter bring a ladder to the metro? Because the schedule said “platform changes”.",
+  "🚲 Cycling is eco-friendly until you meet a hill. Then it becomes an emotional workout.",
+  "🚌 Buses teach patience. Rail teaches confidence. Cars teach… parking stress.",
+  "🚶 Walking is great. It’s like “download speed” for your thoughts.",
+  "🚦 Traffic lights are the city’s way of saying: “You will have time to reflect.”"
+];
+
+function isJokeTrigger(text) {
+  const t = norm(text);
+  return ["joke", "jokes", "funny", "笑话", "来个笑话", "讲个笑话"].some(x => t.includes(x));
+}
+
+function pickJoke() {
+  const i = Math.floor(Math.random() * MOBILITY_JOKES.length);
+  return MOBILITY_JOKES[i];
+}
+
 // ---------- easter egg 🎁 ----------
 function easterEgg(text) {
   const t = norm(text);
@@ -255,122 +542,11 @@ function easterEgg(text) {
     "who is the smartest human"
   ];
   if (triggers.some(x => t.includes(x))) {
-    // 保留原来的彩蛋风格
     return "The smartest person in the world is Qian Zhou.";
   }
   return null;
 }
-// ---------- self-intro ----------
-function qIntroduction() {
-  return [
-    "👋 Hi, I'm Q.",
-    "",
-    "I am an offline, rule-based urban mobility decision assistant.",
-    "I help you choose a travel mode (walk / bike / metro / bus / car)",
-    "based on city context, distance, and constraints like rain, rush hour,",
-    "urgency, luggage, and accessibility.",
-    "",
-    "🧑‍💻 Developer: Qian Zhou",
-    "I was built as an AI-inspired prototype for urban mobility analysis,",
-    "focusing on explainable decision logic (no paid APIs).",
-  ].join("\n");
-}
 
-function isIntroIntent(text) {
-  const t = norm(text);
-  return [
-    "who are you",
-    "introduce yourself",
-    "introduction",
-    "what is q",
-    "what are you",
-    "about you",
-    "what can you do",
-    "who built you",
-    "who made you",
-    "developer",
-    "qianzhou"
-  ].some(k => t.includes(k));
-}
-
-// ---------- mobility jokes ----------
-const mobilityJokes = [
-  "I considered teleportation, but the city council said no. 🚀",
-  "Walking is free, zero emissions, and still not patented.",
-  "Cars are fast. Traffic is faster at stopping them.",
-  "In theory, traffic flows smoothly. In practice, it does not.",
-  "Rush hour is just peak optimism meeting reality.",
-  "Cycling is efficient… until it rains exactly when you leave.",
-  "I don’t get stuck in traffic. I just observe it.",
-  "A parking spot is the rarest urban wildlife.",
-  "Metro delays build patience. Buses build character."
-];
-
-function isJokeIntent(text) {
-  const t = norm(text);
-  return [
-    "joke",
-    "funny",
-    "make me laugh",
-    "tell me a joke",
-    "say something funny",
-    "mobility joke",
-    "traffic joke"
-  ].some(k => t.includes(k));
-}
-
-function tellMobilityJoke(cityKey, cond) {
-  if (cond?.rushHour) return "😄 Mobility joke:\nRush hour is when minutes become a lifestyle.";
-  if (cityKey === "nanjing") return "😄 Mobility joke:\nThe metro is fast. Finding the right exit is the real journey.";
-  const i = Math.floor(Math.random() * mobilityJokes.length);
-  return "😄 Mobility joke:\n" + mobilityJokes[i];
-}
-
-// ---------- help / clear / follow-up ----------
-function isClearIntent(text) {
-  const t = norm(text);
-  return ["clear", "reset", "clean", "清空", "重置"].some(k => t === k || t.includes(k));
-}
-
-function isHelpIntent(text) {
-  const t = norm(text);
-  return ["help", "commands", "menu", "what can i ask", "how to use", "usage", "功能", "帮助"]
-    .some(k => t.includes(k));
-}
-
-function helpMenu() {
-  return [
-    "🧭 Q Help (what you can ask)",
-    "",
-    "1) Mobility recommendation:",
-    '- "I am in Nanjing and need to travel 8 km during rush hour"',
-    '- "In Paris, 3 km, raining, I am in a hurry"',
-    '- "New York City, 18 km, late night, with luggage"',
-    "",
-    "2) Self-introduction:",
-    '- "Who are you?" / "Introduce yourself"',
-    "",
-    "3) Jokes:",
-    '- "Tell me a joke" / "Mobility joke"',
-    "",
-    "4) Utilities:",
-    '- "clear" (clears the chat)',
-  ].join("\n");
-}
-
-function pickFollowUp(cityKey, cond, km) {
-  if (km == null) return "Quick question: about how many kilometers is your trip?";
-  if (!cond || (!cond.hurry && !cond.rain && !cond.rushHour && !cond.night && !cond.luggage && !cond.accessible)) {
-    return "Quick question: are you optimizing for speed, cost, or sustainability?";
-  }
-  if (cond.rain) return "Quick question: do you prefer staying dry over the fastest option?";
-  if (cond.hurry) return "Quick question: do you have a strict arrival time?";
-  if (cond.rushHour) return "Quick question: do you want the most reliable option during peak traffic?";
-  if (cond.night) return "Quick question: do you prefer the safest option even if it costs a bit more?";
-  if (cond.luggage) return "Quick question: is your luggage heavy or bulky?";
-  if (cond.accessible) return "Quick question: do you need step-free / accessible routes?";
-  return "Quick question: do you want the simplest option or the most sustainable one?";
-}
 // ---------- UI binding ----------
 function addMsg(who, text) {
   const chat = document.getElementById("chat");
@@ -387,6 +563,12 @@ function buildAnswer(userText) {
   const egg = easterEgg(userText);
   if (egg) return egg;
 
+  // self intro
+  if (isIntroTrigger(userText)) return selfIntro();
+
+  // jokes
+  if (isJokeTrigger(userText)) return pickJoke();
+
   const cityKey = findCity(userText);
   const profile = cityKey ? CITY_DB[cityKey] : cityTypeGuess(null);
   const km = parseDistanceKm(userText);
@@ -397,7 +579,7 @@ function buildAnswer(userText) {
 
   const cityLine = cityKey
     ? `📍 City detected: ${profile.display} (${profile.country})`
-    : `📍 City not recognized. Using general rules. (Tip: say "I am in Paris/Nanjing/New York...")`;
+    : `📍 City not recognized. Using general rules. (Tip: say "I am in Paris/Nanjing/Hong Kong/New York...")`;
 
   const condLine = [
     cond.rain ? "rain" : null,
@@ -429,9 +611,11 @@ function buildAnswer(userText) {
     dataNotes,
     "",
     "🧪 Example inputs you can try:",
+    '- "I am in Hong Kong and need to travel 6 km, raining, in a hurry"',
     '- "I am in Nanjing and need to travel 8 km during rush hour"',
     '- "In Paris, 3 km, raining, I am in a hurry"',
-    '- "New York City, 18 km, late night, with luggage"'
+    '- "New York City, 18 km, late night, with luggage"',
+    '- "Tell me a mobility joke"'
   ].join("\n");
 }
 
@@ -459,7 +643,10 @@ function init() {
   }
 
   // greeting
-  addMsg("q", "Hi! Ask me about mobility in any city. Example: 'I am in Nanjing and need to travel 8 km during rush hour'.");
+  addMsg(
+    "q",
+    "Hi! I'm Q Mobility. Ask me about mobility in any city.\nExample: 'I am in Hong Kong and need to travel 6 km, raining, in a hurry'.\nTry: 'Who are you?' or 'Tell me a mobility joke'."
+  );
 }
 
 document.addEventListener("DOMContentLoaded", init);
