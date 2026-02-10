@@ -255,12 +255,122 @@ function easterEgg(text) {
     "who is the smartest human"
   ];
   if (triggers.some(x => t.includes(x))) {
-    // 保留你原来的彩蛋风格
+    // 保留原来的彩蛋风格
     return "The smartest person in the world is Qian Zhou.";
   }
   return null;
 }
+// ---------- self-intro ----------
+function qIntroduction() {
+  return [
+    "👋 Hi, I'm Q.",
+    "",
+    "I am an offline, rule-based urban mobility decision assistant.",
+    "I help you choose a travel mode (walk / bike / metro / bus / car)",
+    "based on city context, distance, and constraints like rain, rush hour,",
+    "urgency, luggage, and accessibility.",
+    "",
+    "🧑‍💻 Developer: Qian Zhou",
+    "I was built as an AI-inspired prototype for urban mobility analysis,",
+    "focusing on explainable decision logic (no paid APIs).",
+  ].join("\n");
+}
 
+function isIntroIntent(text) {
+  const t = norm(text);
+  return [
+    "who are you",
+    "introduce yourself",
+    "introduction",
+    "what is q",
+    "what are you",
+    "about you",
+    "what can you do",
+    "who built you",
+    "who made you",
+    "developer",
+    "qianzhou"
+  ].some(k => t.includes(k));
+}
+
+// ---------- mobility jokes ----------
+const mobilityJokes = [
+  "I considered teleportation, but the city council said no. 🚀",
+  "Walking is free, zero emissions, and still not patented.",
+  "Cars are fast. Traffic is faster at stopping them.",
+  "In theory, traffic flows smoothly. In practice, it does not.",
+  "Rush hour is just peak optimism meeting reality.",
+  "Cycling is efficient… until it rains exactly when you leave.",
+  "I don’t get stuck in traffic. I just observe it.",
+  "A parking spot is the rarest urban wildlife.",
+  "Metro delays build patience. Buses build character."
+];
+
+function isJokeIntent(text) {
+  const t = norm(text);
+  return [
+    "joke",
+    "funny",
+    "make me laugh",
+    "tell me a joke",
+    "say something funny",
+    "mobility joke",
+    "traffic joke"
+  ].some(k => t.includes(k));
+}
+
+function tellMobilityJoke(cityKey, cond) {
+  if (cond?.rushHour) return "😄 Mobility joke:\nRush hour is when minutes become a lifestyle.";
+  if (cityKey === "nanjing") return "😄 Mobility joke:\nThe metro is fast. Finding the right exit is the real journey.";
+  const i = Math.floor(Math.random() * mobilityJokes.length);
+  return "😄 Mobility joke:\n" + mobilityJokes[i];
+}
+
+// ---------- help / clear / follow-up ----------
+function isClearIntent(text) {
+  const t = norm(text);
+  return ["clear", "reset", "clean", "清空", "重置"].some(k => t === k || t.includes(k));
+}
+
+function isHelpIntent(text) {
+  const t = norm(text);
+  return ["help", "commands", "menu", "what can i ask", "how to use", "usage", "功能", "帮助"]
+    .some(k => t.includes(k));
+}
+
+function helpMenu() {
+  return [
+    "🧭 Q Help (what you can ask)",
+    "",
+    "1) Mobility recommendation:",
+    '- "I am in Nanjing and need to travel 8 km during rush hour"',
+    '- "In Paris, 3 km, raining, I am in a hurry"',
+    '- "New York City, 18 km, late night, with luggage"',
+    "",
+    "2) Self-introduction:",
+    '- "Who are you?" / "Introduce yourself"',
+    "",
+    "3) Jokes:",
+    '- "Tell me a joke" / "Mobility joke"',
+    "",
+    "4) Utilities:",
+    '- "clear" (clears the chat)',
+  ].join("\n");
+}
+
+function pickFollowUp(cityKey, cond, km) {
+  if (km == null) return "Quick question: about how many kilometers is your trip?";
+  if (!cond || (!cond.hurry && !cond.rain && !cond.rushHour && !cond.night && !cond.luggage && !cond.accessible)) {
+    return "Quick question: are you optimizing for speed, cost, or sustainability?";
+  }
+  if (cond.rain) return "Quick question: do you prefer staying dry over the fastest option?";
+  if (cond.hurry) return "Quick question: do you have a strict arrival time?";
+  if (cond.rushHour) return "Quick question: do you want the most reliable option during peak traffic?";
+  if (cond.night) return "Quick question: do you prefer the safest option even if it costs a bit more?";
+  if (cond.luggage) return "Quick question: is your luggage heavy or bulky?";
+  if (cond.accessible) return "Quick question: do you need step-free / accessible routes?";
+  return "Quick question: do you want the simplest option or the most sustainable one?";
+}
 // ---------- UI binding ----------
 function addMsg(who, text) {
   const chat = document.getElementById("chat");
